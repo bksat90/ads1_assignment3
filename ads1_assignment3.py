@@ -51,10 +51,10 @@ def HeatmapPreprocess(df, year):
                   'AG.LND.AGRI.K2', 'EN.ATM.CO2E.KT']
     hdf = hdf.loc[hdf['Indicator Code'].isin(indicators)]
     hdf.to_csv('myfile.csv')
-    
+
     # find number of countries
     countries = hdf['Country Name'].unique()
-    
+
     # find number of indicator
     ind_count = len(indicators)
 
@@ -103,16 +103,28 @@ df = Preprocess(df)
 year = 2015
 # process the data for the heat map
 hdf = HeatmapPreprocess(df, year)
+heat_df = hdf.copy()
+
+heat_df.rename(columns={'SP.URB.TOTL': 'Urban Population',
+                    'SP.POP.TOTL': 'Total Population',
+                    'SH.DYN.MORT': 'Morality Rate',
+                    'ER.H2O.FWTL.K3': 'Fresh Water Withdrawals',
+                    'AG.LND.FRST.K2': 'Forest area',
+                    'AG.LND.ARBL.ZS': 'Arable Land',
+                    'AG.LND.AGRI.K2': 'Agricultural Land',
+                    'EN.ATM.CO2E.KT': 'CO2 emissions'},
+           
+           inplace=True)
 
 # display the heat map
 plt.figure(figsize=(8, 6))
-ct.map_corr(hdf)
-plt.title('Heat Map')
+ct.map_corr(heat_df)
+plt.title('Heat Map', fontweight="bold", fontsize=20)
 plt.show()
 
 # display the scatter matrix
 plt.figure(dpi=600)
-axes = pd.plotting.scatter_matrix(hdf, figsize=(9.0, 9.0))
+axes = pd.plotting.scatter_matrix(heat_df, figsize=(9.0, 9.0))
 for ax in axes.flatten():
     ax.xaxis.label.set_rotation(90)
     ax.yaxis.label.set_rotation(0)
@@ -129,7 +141,7 @@ hdf_fit = hdf[['SH.DYN.MORT', 'AG.LND.ARBL.ZS']].copy()
 hdf_fit, df_min, df_max = ct.scaler(hdf_fit)
 print(hdf_fit.describe())
 
-print("n score using silhouette score:")
+print("n score using silhouette method:")
 # loop over trial numbers
 for ic in range(2, 15):
     # set up kmeans and fit
@@ -149,6 +161,8 @@ kmeans.fit(hdf_fit)
 labels = kmeans.labels_
 cen = kmeans.cluster_centers_
 
+# cluster_map[cluster_map.cluster == 3]
+
 plt.figure(figsize=(6.0, 6.0), dpi=600)
 # scatter plot with colours selected using the cluster numbers
 plt.scatter(hdf_fit["SH.DYN.MORT"],
@@ -161,10 +175,14 @@ yc = cen[:, 1]
 plt.scatter(xc, yc, c="k", marker="d", s=80)
 
 # display the labels and title
-plt.xlabel("SH.DYN.MORT")
-plt.ylabel("AG.LND.ARBL.ZS")
-plt.title("Three Clusters")
+plt.xlabel("Mortality rate under 5 years age")
+plt.ylabel("Arable land (% of land area)")
+plt.title("Three Clusters", fontweight="bold", fontsize=12)
 plt.show()
+
+hdf[kmeans.labels_==0].head(5)
+hdf[kmeans.labels_==1].head(10)
+hdf[kmeans.labels_==2].head(10)
 
 # fitting the data
 # x and y for the data fitting
@@ -181,7 +199,7 @@ y1 = linfunc(x, *popt)
 
 # display the linear fit data
 plt.figure(dpi=600)
-plt.title("Linear Fit")
+plt.title("Linear Fit", fontweight="bold", fontsize=12)
 plt.plot(x, y, "o", markersize=3, label="data")
 plt.plot(x, y1, label="fit")
 plt.xlabel('Total Population (in billions)')
