@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import cluster_tools as ct
 import sklearn.cluster as cluster
 import sklearn.metrics as skmet
+import scipy.optimize as opt
+import errors as err
 
 
 
@@ -39,7 +41,6 @@ def Preprocess(df):
     df.drop('Country Code', axis=1, inplace=True)
     df.fillna(0, inplace=True)
     return df
-
 
 
 def HeatmapPreprocess(df, year):
@@ -82,6 +83,14 @@ def HeatmapPreprocess(df, year):
     return mod_df
 
 
+def linfunc(x, a, b):
+    """ Function for fitting
+    x: independent variable
+    a, b: parameters to be fitted
+    """
+    return a*x + b
+    
+
 # main code
 # Reads data from the world bank climate data
 df = pd.read_csv('API_19_DS2_en_csv_v2_4902199.csv', skiprows=4)
@@ -101,7 +110,11 @@ ct.map_corr(hdf)
 plt.show()
 
 plt.figure(dpi=600)
-pd.plotting.scatter_matrix(hdf, figsize=(9.0, 9.0))
+axes = pd.plotting.scatter_matrix(hdf, figsize=(9.0, 9.0))
+for ax in axes.flatten():
+    ax.xaxis.label.set_rotation(90)
+    ax.yaxis.label.set_rotation(0)
+    ax.yaxis.label.set_ha('right')
 plt.tight_layout()    # helps to avoid overlap of labels
 plt.show()
 
@@ -155,4 +168,25 @@ plt.scatter(xc, yc, c="k", marker="d", s=80)
 plt.xlabel("SH.DYN.MORT")
 plt.ylabel("AG.LND.ARBL.ZS")
 plt.title("3 clusters")
+plt.show()
+
+# fitting
+
+x = hdf['SP.POP.TOTL'].to_numpy()
+y = hdf['ER.H2O.FWTL.K3'].to_numpy()
+
+popt, pcorr = opt.curve_fit(linfunc, x, y)
+print("Fit parameter", popt)
+
+# extract variances and calculate sigmas
+sigmas = np.sqrt(np.diag(pcorr))
+lower, upper = err.err_ranges(x, linfunc, popt, sigmas)
+y1 = linfunc(x, *popt)
+
+
+plt.figure()
+plt.title("Linear")
+plt.plot(x, y, "o", markersize=3, label="data")
+plt.plot(x, y1, label="fit")
+plt.legend(loc="upper left")
 plt.show()
