@@ -41,86 +41,45 @@ def Preprocess(df):
     return df
 
 
-def VariableTrend(df, indicator):
-    """
-    This function filters the trend for particular indicator
-    """
-    # filter the given indicator
-    var_df = df.loc[df['Indicator Code'] == indicator]
-    # drops unneccessary columns
-    var_df.drop(['Indicator Name', 'Indicator Code'],
-                axis=1, inplace=True)
-    var_df.reset_index(drop=True, inplace=True)
-    # transpose the dataframe and renamed the column names
-    var_df = var_df.T
-    var_df = var_df.rename(columns=var_df.iloc[0])
-    var_df.drop(labels=['Country Name'], axis=0, inplace=True)
-    var_df.rename(columns={'United Kingdom': 'UK',
-                           'Russian Federation': 'Russia',
-                           'United States': 'US'}, inplace=True)
-    var_df.reset_index(inplace=True)
-    var_df.drop(var_df.tail(1).index, inplace=True)
 
-    # change the data type of the dataframe to float
-    columns = list(var_df.columns)
-    for col in columns:
-        if col != 'Year':
-            var_df[col] = var_df[col].astype('float64')
-
-    return var_df
-
-
-def HeatmapPreprocess(df, country):
+def HeatmapPreprocess(df, year):
     """
     This function processes the given data frame so that resulting data frame
     can be used to generate the heatmap
     """
-    hdf = df.loc[df['Country Name'] == country]
+    hdf = df.loc[:, df.columns.isin(['Country Name', 'Indicator Name',
+                                      'Indicator Code', str(year)])]
+    indicators = ['SP.URB.TOTL', 'SP.POP.TOTL', 'SH.DYN.MORT',
+                  'ER.H2O.FWTL.K3', 'AG.LND.FRST.K2', 'AG.LND.ARBL.ZS',
+                  'AG.LND.AGRI.K2', 'EN.ATM.CO2E.KT']
+    hdf = hdf.loc[hdf['Indicator Code'].isin(indicators)]
+    hdf.to_csv('myfile.csv')
+    # find number of countries
+    countries = hdf['Country Name'].unique()
+    # find number of indicator
+    ind_count = len(indicators)
 
-    # filters required indicators
-    indicator = ['SP.URB.TOTL', 'SP.POP.TOTL', 'SH.DYN.MORT', 'ER.H2O.FWTL.K3',
-                 'AG.LND.FRST.K2', 'AG.LND.ARBL.ZS', 'AG.LND.AGRI.K2',
-                 'EN.ATM.CO2E.KT']
-    hdf = hdf.loc[hdf['Indicator Code'].isin(indicator)]
+    # columns names for the empty data frame
+    col_list = ['Country', 'SP.URB.TOTL', 'SP.POP.TOTL', 'SH.DYN.MORT',
+                'ER.H2O.FWTL.K3', 'EN.ATM.CO2E.KT', 'AG.LND.FRST.K2',
+                'AG.LND.ARBL.ZS', 'AG.LND.AGRI.K2'] 
 
-    # removes the unnecessary columns
-    hdf.drop(['Country Name', 'Indicator Code'], axis=1, inplace=True)
-    hdf.reset_index(drop=True, inplace=True)
+    # creating an empty dataframe with columns as col_list
+    mod_df = pd.DataFrame(columns=col_list)
 
-    # transpose the data
-    hdf = hdf.T
-    hdf.reset_index(inplace=True)
-    hdf = hdf.rename(columns=hdf.iloc[0])
-    hdf.drop(0, inplace=True)
+    # transform the data for heatmap
+    for count in range(len(countries)):
+        # temporary dictionary with only country
+        temp = {'Country': countries[count]}
+        for ind in range(ind_count):
+            cname = hdf.iloc[(count*ind_count)+ind, 2]
+            value = hdf.iloc[(count*ind_count)+ind, 3]
+            temp[cname] = value
+                   
+        # append the dict temp to modified dictionary
+        mod_df = mod_df.append(temp, ignore_index=True)
 
-    # removes the last three rows as there is no data for those years
-    hdf.drop(hdf.tail(3).index, inplace=True)
-
-    # rename the columns names
-    hdf.rename(columns={'Indicator Name': 'Year',
-                        'Population, total': 'Total Population',
-                        'Mortality rate, under-5 (per 1,000 live births)':
-                        'Mortality rate',
-                        'Annual freshwater withdrawals, total (billion cubic meters)': 'Annual freshwater withdrawals',
-                        'CO2 emissions (kt)': 'CO2 emissions',
-                        'Forest area (sq. km)': 'Forest area',
-                        'Arable land (% of land area)': 'Arable land',
-                        'Agricultural land (sq. km)': 'Agricultural land'},
-               inplace=True)
-
-    hdf['Year'] = hdf['Year'].astype('int')
-    # keeps data after 1990 as the data is available from 1990
-    hdf = hdf[hdf['Year'] >= 1990]
-    hdf.reset_index(drop=True, inplace=True)
-    hdf['Year'] = hdf['Year'].astype('object')
-
-    # type casting of the dataframe columns
-    columns = list(hdf.columns)
-    for col in columns:
-        if col != 'Year':
-            hdf[col] = hdf[col].astype('float64')
-
-    return hdf
+    return mod_df
 
 
 # main code
@@ -132,22 +91,68 @@ df = FilterData(df)
 df = Preprocess(df)
 
 
-# heatmap for Germany
-hdf_Germany = HeatmapPreprocess(df, 'Germany')
-hdf_Germany.describe()
+# change in heat map
+year = 2015
+hdf = HeatmapPreprocess(df, year)
 
-plt.figure(dpi=500)
-ct.map_corr(hdf_Germany)
-plt.title('Heatmap for Germany', fontweight="bold")
-plt.savefig('hmap_Germany.png')
+plt.figure(figsize=(8, 6))
+#sns.heatmap(corr_france_heat_map, cmap=cmap, annot=True, linewidths=0.5, annot_kws={'size': 10})
+ct.map_corr(hdf)
 plt.show()
 
-# heatmap for Germany
-hdf_China = HeatmapPreprocess(df, 'China')
-hdf_China.describe()
+plt.figure(dpi=600)
+pd.plotting.scatter_matrix(hdf, figsize=(9.0, 9.0))
+plt.tight_layout()    # helps to avoid overlap of labels
+plt.show()
 
-plt.figure(dpi=500)
-ct.map_corr(hdf_China)
-plt.title('Heatmap for China', fontweight="bold")
-plt.savefig('hmap_China.png')
+
+###########finding n clusters
+# extract columns for fitting. 
+hdf_fit = hdf[['SH.DYN.MORT', 'AG.LND.ARBL.ZS']].copy()
+
+# normalise dataframe and inspect result
+# normalisation is done only on the extract columns. .copy() prevents
+# changes in df_fit to affect df_fish. This make the plots with the 
+# original measurements
+hdf_fit, df_min, df_max = ct.scaler(hdf_fit)
+print(hdf_fit.describe())
+print()
+
+print("n   score")
+# loop over trial numbers of clusters calculating the silhouette
+for ic in range(2, 15):
+    # set up kmeans and fit
+    kmeans = cluster.KMeans(n_clusters=ic)
+    kmeans.fit(hdf_fit)     
+
+    # extract labels and calculate silhoutte score
+    labels = kmeans.labels_
+    print (ic, skmet.silhouette_score(hdf_fit, labels))
+
+
+######display clsuters
+nc = 3
+kmeans = cluster.KMeans(n_clusters=nc)
+kmeans.fit(hdf_fit)     
+
+# extract labels and cluster centres
+labels = kmeans.labels_
+cen = kmeans.cluster_centers_
+
+plt.figure(figsize=(6.0, 6.0), dpi=600)
+# scatter plot with colours selected using the cluster numbers
+plt.scatter(hdf_fit["SH.DYN.MORT"],
+            hdf_fit["AG.LND.ARBL.ZS"],
+            c=labels, cmap="tab10")
+# colour map Accent selected to increase contrast between colours
+
+# show cluster centres
+xc = cen[:,0]
+yc = cen[:,1]
+plt.scatter(xc, yc, c="k", marker="d", s=80)
+# c = colour, s = size
+
+plt.xlabel("SH.DYN.MORT")
+plt.ylabel("AG.LND.ARBL.ZS")
+plt.title("3 clusters")
 plt.show()
